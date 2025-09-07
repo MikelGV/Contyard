@@ -7,20 +7,16 @@ import (
     In the model we store the state
 **/
 type model struct {
-    choices []string
-    cursor int
-    selected map[int]struct{}
+    stats []string
+    err error
 }
 
 /**
     Here we define our initial state
 **/
-func initialModel() model {
+func InitialModel() model {
     return model{
-        choices: []string{"buy carrots", "buy celery", "buy kohlrabi"},
 
-        // a map which indicates which choices are selected.
-        selected: make(map[int]struct{}),
     }
 }
 
@@ -28,5 +24,6 @@ func initialModel() model {
     Initial I/O
 **/
 func (m model) Init() tea.Cmd {
+    // i have to see how or if i need to return anything here so for now i will maintain it a nil
     return nil
 }
