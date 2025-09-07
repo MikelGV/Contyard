@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"time"
 
+	"github.com/MikelGV/Contyard/internal/data/types"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 )
@@ -25,45 +27,61 @@ type DockerStats struct {
 /**
     Docker will be our default when loocking containers health
 **/
-func DockerConStats() error {
+func GetDockerConStats(ctx context.Context) ([]types.ContainerStats, error) {
     /**
         I have to add a break if no containers are found
     **/
     cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
     if err != nil {
-        return fmt.Errorf("Client setup failed: %w", err)
+        return nil, fmt.Errorf("Client setup failed: %w", err)
     }
     defer cli.Close()
 
-    containers, err := cli.ContainerList(context.Background(), container.ListOptions{All: true})
+    containers, err := cli.ContainerList(ctx, container.ListOptions{})
     if err != nil {
-        return fmt.Errorf("failed to get all containers: %w", err)
+        return nil, fmt.Errorf("failed to get all containers: %w", err)
     }
 
+    if len(containers) == 0 {
+        return []types.ContainerStats{}, nil
+    }
+
+    var ContainerStats []types.ContainerStats 
     for _, ctr := range containers {
-        stats, err := cli.ContainerStats(context.Background(), ctr.ID, false )
+        stats, err := cli.ContainerStats(ctx, ctr.ID, false )
         if err != nil {
-            return fmt.Errorf("failed to get containers stats: %w", err)
+            return nil, fmt.Errorf("failed to get containers stats: %w", err)
         }
 
-        defer stats.Body.Close()
-
-        body, err := io.ReadAll(stats.Body)
-        if err != nil {
-            return fmt.Errorf("failed to read all stats: %w", err)
+        dec := json.NewDecoder(stats.Body)
+        var ds DockerStats
+        if err :=dec.Decode(&ds); err != nil {
+            stats.Body.Close()
+            continue
         }
 
-        var ContainerStats DockerStats 
-        err = json.Unmarshal(body, &ContainerStats)
-        if err != nil {
-            return fmt.Errorf("failed to Unmarshal stats: %w", err)
-        }
+        stats.Body.Close()
 
-        fmt.Printf("Container: %s\n",  ctr.ID)
-        fmt.Printf("CPU usage: %d\n",  ContainerStats.CPUStats.CPUUsage.TotalUsage)
-        fmt.Printf("Memory usage: %d\nMemory limit: %d\n",  ContainerStats.MemoryStats.Usage, ContainerStats.MemoryStats.Limit)
+        ContainerStats = append(ContainerStats, types.ContainerStats{
+            ID: ctr.ID[:12],
+            NAME: ctr.Names[0],
+            CPUUSAGE: ds.CPUStats.CPUUsage.TotalUsage,
+            MEMORYUSAGE: ds.MemoryStats.Usage,
+            MEMORYLIMIT: ds.MemoryStats.Limit,
+        })
 
     }
-    return nil
+
+    return ContainerStats, nil
+}
+
+/**
+    Returns a channel for real-time updates.
+**/
+func StreamDockerConStats(ctx context.Context, interval time.Duration) (chan([]types.ContainerStats), chan(error)) {
+    statsChan := make(chan []types.ContainerStats)
+    errChan := make(chan error)
+
+    return nil, nil
 }
 
