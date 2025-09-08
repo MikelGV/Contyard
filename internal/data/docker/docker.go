@@ -9,8 +9,29 @@ import (
 
 	"github.com/MikelGV/Contyard/internal/data/types"
 	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/network"
 	"github.com/moby/moby/client"
+	spec "github.com/opencontainers/image-spec/specs-go/v1"
 )
+
+type DockerClient interface {
+    ContainerList(ctx context.Context, option container.ListOptions) ([]container.Summary, error)
+    ContainerStats(ctx context.Context, containerID string, stream bool) (container.StatsResponse, error)
+    Close() error
+}
+
+type RealDockerClient struct {
+    *client.Client
+}
+
+func ClientStart() (*RealDockerClient, error) {
+    cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+    if err != nil {
+        return nil, err
+    }
+
+    return &RealDockerClient{cli}, nil
+}
 
 type DockerStats struct {
     CPUStats    struct {
@@ -27,11 +48,11 @@ type DockerStats struct {
 /**
     Docker will be our default when loocking containers health
 **/
-func GetDockerConStats(ctx context.Context) ([]types.ContainerStats, error) {
+func GetDockerConStats(ctx context.Context, start ClientStart) ([]types.ContainerStats, error) {
     /**
         I have to add a break if no containers are found
     **/
-    cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+    cli, err := start() 
     if err != nil {
         return nil, fmt.Errorf("Client setup failed: %w", err)
     }
@@ -82,6 +103,15 @@ func StreamDockerConStats(ctx context.Context, interval time.Duration) (chan([]t
     statsChan := make(chan []types.ContainerStats)
     errChan := make(chan error)
 
-    return nil, nil
+    go func() {
+        timer := time.NewTicker()
+        defer timer.Stop()
+
+        for {
+            select {}
+        }
+    }
+
+    return statsChan, nil
 }
 
