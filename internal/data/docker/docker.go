@@ -4,27 +4,27 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"time"
+
 
 	"github.com/MikelGV/Contyard/internal/data/types"
 	"github.com/moby/moby/api/types/container"
-	"github.com/moby/moby/api/types/network"
+
 	"github.com/moby/moby/client"
-	spec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 type DockerClient interface {
     ContainerList(ctx context.Context, option container.ListOptions) ([]container.Summary, error)
-    ContainerStats(ctx context.Context, containerID string, stream bool) (container.StatsResponse, error)
+    ContainerStats(ctx context.Context, containerID string, stream bool) (client.StatsResponseReader, error)
     Close() error
 }
 
 type RealDockerClient struct {
     *client.Client
 }
+type ClientStart func() (DockerClient, error)
 
-func ClientStart() (*RealDockerClient, error) {
+func DefaultClientStart() (*RealDockerClient, error) {
     cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
     if err != nil {
         return nil, err
@@ -83,9 +83,14 @@ func GetDockerConStats(ctx context.Context, start ClientStart) ([]types.Containe
 
         stats.Body.Close()
 
+        name := ""
+        if len(ctr.Names) > 0 {
+            name = ctr.Names[0]
+        }
+
         ContainerStats = append(ContainerStats, types.ContainerStats{
             ID: ctr.ID[:12],
-            NAME: ctr.Names[0],
+            NAME: name,
             CPUUSAGE: ds.CPUStats.CPUUsage.TotalUsage,
             MEMORYUSAGE: ds.MemoryStats.Usage,
             MEMORYLIMIT: ds.MemoryStats.Limit,
@@ -99,19 +104,30 @@ func GetDockerConStats(ctx context.Context, start ClientStart) ([]types.Containe
 /**
     Returns a channel for real-time updates.
 **/
-func StreamDockerConStats(ctx context.Context, interval time.Duration) (chan([]types.ContainerStats), chan(error)) {
+func StreamDockerConStats(ctx context.Context,start ClientStart, interval time.Duration) (chan([]types.ContainerStats), chan(error)) {
     statsChan := make(chan []types.ContainerStats)
     errChan := make(chan error)
 
     go func() {
-        timer := time.NewTicker()
-        defer timer.Stop()
+        ticker := time.NewTicker(interval)
+        defer ticker.Stop()
+        defer close(statsChan)
+        defer close(errChan)
 
         for {
-            select {}
+            select {
+            case <-ctx.Done():
+                return 
+            case <-ticker.C:
+                stats, err := GetDockerConStats(ctx, start)
+                if err != nil {
+                    errChan <- err
+                    continue
+                }
+                statsChan <- stats
+            }
         }
-    }
+    }()
 
-    return statsChan, nil
+    return statsChan, errChan
 }
-
