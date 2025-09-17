@@ -3,10 +3,8 @@ package docker_test
 import (
 	"context"
 	"fmt"
-    /**
 	"io"
 	"strings"
-**/
 	"testing"
 	"time"
 
@@ -41,7 +39,6 @@ func (m *MockDockerClient) Close() error {
 **/
 func TestStreamDocker(t *testing.T) {
     ctx := context.Background()
-/**
     t.Run("Streams multiple containers stats", func(t *testing.T) {
         mockClient := &MockDockerClient{}
         containers := []container.Summary{
@@ -163,13 +160,13 @@ func TestStreamDocker(t *testing.T) {
 
         mockClient.AssertExpectations(t)
     })
-**/
+
     t.Run("Handle multiple GetDockerConStats errors", func(t *testing.T) {
         mockClient := &MockDockerClient{}
 
+        mockClient.On("ContainerList", mock.Anything, container.ListOptions{}).Return([]container.Summary(nil), fmt.Errorf("docker error")).Twice()
+        mockClient.On("Close").Return(nil).Twice()
         start := func() (data.DockerClient, error) {
-            mockClient.On("ContainerList", mock.Anything, container.ListOptions{}).Return([]container.Summary(nil), fmt.Errorf("docker error")).Twice()
-            mockClient.On("Close").Return(nil).Twice()
             return mockClient, nil
         }
 
@@ -178,30 +175,23 @@ func TestStreamDocker(t *testing.T) {
 
         statsChan, errChan := data.StreamDockerConStats(ctx, start, 10*time.Millisecond)
 
-        // First error
-        select {
-        case err := <-errChan:
-            assert.Contains(t, err.Error(), "failed to get all containers")
-        case stats := <-statsChan:
-            t.Fatalf("Unexpected stats: %v", stats)
-        case <-time.After(500 * time.Millisecond):
-            t.Fatal("Time out waiting for error")
-        }
-
-        // Second error
-        select {
-        case err := <-errChan:
-            assert.Contains(t, err.Error(), "failed to get all containers")
-        case stats := <-statsChan:
-            t.Fatalf("Unexpected stats: %v", stats)
-        case <-time.After(500 * time.Millisecond):
-            t.Fatal("Time out waiting for second error")
+        errorsReceived := 0
+        for errorsReceived < 2 {
+            select {
+            case err := <-errChan:
+                assert.Contains(t, err.Error(), "failed to get all containers")
+                errorsReceived++
+            case stats := <-statsChan:
+                t.Fatalf("Unexpected stats: %v", stats)
+            case <-time.After(500 * time.Millisecond):
+                t.Fatalf("Time out waiting for %d error(s); received %d\n", 2, errorsReceived)
+            }
         }
 
         mockClient.AssertExpectations(t)
 
     })
-/**
+    
     t.Run("Stops streaming on context cancellation", func(t *testing.T) {
         mockClient := &MockDockerClient{}
 
@@ -239,5 +229,63 @@ func TestStreamDocker(t *testing.T) {
 
         mockClient.AssertExpectations(t)
     })
-**/
+
+    t.Run("Mixed stats and error", func(t *testing.T) {
+        mockClient := &MockDockerClient{}
+        containers := []container.Summary{
+            {
+                ID: "12345678901234abcd",
+                Names: []string{"/test-container1"},
+            },
+        }
+
+        statsJSON1 := `{
+            "cpu_stats": {"cpu_usage": {"total_usage": 1000}},
+            "memory_stats": {"usage": 1024, "limit": 2048}
+        }`
+
+        mockStats1 := client.StatsResponseReader{
+            Body: io.NopCloser(strings.NewReader(statsJSON1)),
+        }
+
+        callCount := 0
+        start := func() (data.DockerClient, error) {
+            callCount++
+            if callCount == 1 {
+                mockClient.On("ContainerList", mock.Anything, container.ListOptions{}).Return(containers, nil).Once()
+                mockClient.On("ContainerStats", mock.Anything, "12345678901234abcd", false).Return(mockStats1, nil).Once()
+                mockClient.On("Close").Return(nil).Once()
+            } else {
+                mockClient.On("ContainerList", mock.Anything, container.ListOptions{}).Return([]container.Summary(nil), fmt.Errorf("docker error")).Once()
+                mockClient.On("Close").Return(nil).Once()
+            }
+            return mockClient, nil
+        }
+
+        ctx, cancel := context.WithCancel(ctx)
+        defer cancel()
+        statsChan, errChan := data.StreamDockerConStats(ctx, start, 10*time.Millisecond)
+
+        select {
+        case stats := <-statsChan:
+            assert.Len(t, stats, 1)
+            assert.Equal(t, "123456789012", stats[0].ID)
+        case err := <-errChan:
+            t.Fatalf("Unexpected error: %v", err)
+        case <-time.After(100 * time.Millisecond):
+            t.Fatal("Timeout waiting for stats")
+        }
+
+        select {
+        case err := <-errChan:
+            assert.Contains(t, err.Error(), "failed to get all containers:")
+        case stats := <-statsChan:
+            t.Fatalf("Unexpected stats: %v", stats)
+        case <-time.After(100 * time.Millisecond):
+            t.Fatal("Timeout waiting for error")
+        }
+
+        mockClient.AssertExpectations(t)
+
+    })
 }
