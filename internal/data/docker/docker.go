@@ -24,7 +24,7 @@ type RealDockerClient struct {
 }
 type ClientStart func() (DockerClient, error)
 
-func DefaultClientStart() (*RealDockerClient, error) {
+func DefaultClientStart() (DockerClient, error) {
     cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
     if err != nil {
         return nil, err
