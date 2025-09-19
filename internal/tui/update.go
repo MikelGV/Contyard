@@ -5,7 +5,7 @@ import tea "github.com/charmbracelet/bubbletea"
 /**
     We handle the message types here
 **/
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
     switch msg := msg.(type) {
     
     case statsMsg:

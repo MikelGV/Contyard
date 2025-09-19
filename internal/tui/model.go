@@ -1,29 +1,57 @@
 package tui
 
 import (
-    tea "github.com/charmbracelet/bubbletea"
+	"context"
+	"time"
+
+	data "github.com/MikelGV/Contyard/internal/data/docker"
+	"github.com/MikelGV/Contyard/internal/data/types"
+	"github.com/MikelGV/Contyard/internal/tui/components"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss/table"
 )
+
 /**
     In the model we store the state
 **/
-type model struct {
-    stats []string
-    err error
+type Model struct {
+    table func()*table.Table
+    all bool
+    docker bool
+    podman bool
+    kubernetes bool
+    statsChan chan []types.ContainerStats
+    errChan chan error
+    cancel context.CancelFunc
 }
 
 /**
     Here we define our initial state
 **/
-func InitialModel() model {
-    return model{
-
+func NewModel(docker, all, podman, kubernetes bool) Model {
+    var statsChan chan []types.ContainerStats
+    var errChan chan error
+    ctx, cancel := context.WithCancel(context.Background())
+    if docker {
+        statsChan, errChan = data.StreamDockerConStats(ctx, data.DefaultClientStart, 2*time.Second)
+    }
+    // add podman, kubernetes, and all later
+    return Model{
+        table: components.CreateTable,
+        docker: docker,
+        podman: podman,
+        kubernetes: kubernetes,
+        all: all,
+        statsChan: statsChan,
+        errChan: errChan,
+        cancel: cancel,
     }
 }
 
 /**
     Initial I/O
 **/
-func (m model) Init() tea.Cmd {
+func (m Model) Init() tea.Cmd {
     // i have to see how or if i need to return anything here so for now i will maintain it a nil
     return nil
 }
