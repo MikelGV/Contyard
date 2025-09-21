@@ -6,22 +6,21 @@ import (
 
 	data "github.com/MikelGV/Contyard/internal/data/docker"
 	"github.com/MikelGV/Contyard/internal/data/types"
-	"github.com/MikelGV/Contyard/internal/tui/components"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss/table"
 )
 
 /**
     In the model we store the state
 **/
 type Model struct {
-    table func()*table.Table
     all bool
     docker bool
     podman bool
     kubernetes bool
     statsChan chan []types.ContainerStats
     errChan chan error
+    err error
+    stats []types.ContainerStats
     cancel context.CancelFunc
 }
 
@@ -37,7 +36,6 @@ func NewModel(docker, all, podman, kubernetes bool) Model {
     }
     // add podman, kubernetes, and all later
     return Model{
-        table: components.CreateTable,
         docker: docker,
         podman: podman,
         kubernetes: kubernetes,

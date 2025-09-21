@@ -1,12 +1,13 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 
+	"github.com/MikelGV/Contyard/internal/tui"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 )
-
-
 
 // rootCmd represents the base command when called without any subcommands
 var (
@@ -29,7 +30,13 @@ var (
     `,
         // Here i should run the defautl command(AKA: no flags so it should show 
         // every docker/podman, and kubernetes stats)
-        Run: func(cmd *cobra.Command, args []string) { },
+        Run: func(cmd *cobra.Command, args []string) { 
+            t := tea.NewProgram(tui.NewModel(docker, podman, kubernetes, all))
+            if _, err := t.Run(); err != nil {
+                fmt.Printf("there has been an error: %v", err)
+                os.Exit(1)
+            }
+        },
     }
 )
 

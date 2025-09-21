@@ -1,21 +1,29 @@
 package tui
 
 import (
+	"github.com/MikelGV/Contyard/internal/tui/components"
 	"github.com/charmbracelet/lipgloss"
 )
 
 /**
     This is all of the cool "FrontEnd" or what the users will see :D
 **/
+var (
+    errorStyle = lipgloss.NewStyle().
+        Foreground(lipgloss.Color("#DB222A")).
+        Padding(0, 1)
+)
 
-var baseStyle = lipgloss.NewStyle().
-    BorderStyle(lipgloss.NormalBorder()).
-    BorderForeground(lipgloss.Color("250"))
 
 func (m Model) View() string {
-    if m.docker {
-        return baseStyle.Render() 
+    var output []string
+    if !m.docker {
+        output = append(output, errorStyle.Render("No data sources selected (use -d)"))
+    } else {
+        table := components.CreateTable(m.stats)
+        output = append(output, table)
     }
-    return "No data to display"
+
+    return lipgloss.JoinVertical(lipgloss.Left, output...) 
 }
 
