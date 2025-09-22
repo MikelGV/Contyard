@@ -2,6 +2,7 @@ package tui
 
 import (
 	"github.com/MikelGV/Contyard/internal/data/types"
+	"github.com/MikelGV/Contyard/internal/tui/components"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -13,18 +14,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
     switch msg := msg.(type) {
     
     case []types.ContainerStats:
-        /**
-            We have to handle the stats so we have to compare the model stats
-            with the msg adn check that the error is nil
-        **/
         m.stats = msg
         m.err = nil
+        m.table = components.CreateTable(m.stats)
         return m, waitForStats(m) 
 
     case error:
-        /**
-            We have to handle if there is an error  
-        **/
         m.err = msg
         return m, waitForStats(m) 
 

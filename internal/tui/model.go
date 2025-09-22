@@ -7,6 +7,7 @@ import (
 	data "github.com/MikelGV/Contyard/internal/data/docker"
 	"github.com/MikelGV/Contyard/internal/data/types"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss/table"
 )
 
 /**
@@ -21,6 +22,7 @@ type Model struct {
     errChan chan error
     err error
     stats []types.ContainerStats
+    table *table.Table
     cancel context.CancelFunc
 }
 
@@ -28,11 +30,11 @@ type Model struct {
     Here we define our initial state
 **/
 func NewModel(docker, all, podman, kubernetes bool) Model {
+    ctx, cancel := context.WithCancel(context.Background())
     var statsChan chan []types.ContainerStats
     var errChan chan error
-    ctx, cancel := context.WithCancel(context.Background())
     if docker {
-        statsChan, errChan = data.StreamDockerConStats(ctx, data.DefaultClientStart, 2*time.Second)
+        statsChan, errChan = data.StreamDockerConStats(ctx, data.DefaultClientStart, 100*time.Millisecond)
     }
     // add podman, kubernetes, and all later
     return Model{
@@ -42,6 +44,7 @@ func NewModel(docker, all, podman, kubernetes bool) Model {
         all: all,
         statsChan: statsChan,
         errChan: errChan,
+        table: table.New(),
         cancel: cancel,
     }
 }
@@ -50,6 +53,5 @@ func NewModel(docker, all, podman, kubernetes bool) Model {
     Initial I/O
 **/
 func (m Model) Init() tea.Cmd {
-    // i have to see how or if i need to return anything here so for now i will maintain it a nil
-    return nil
+    return tea.Batch(waitForStats(m), tea.EnterAltScreen)
 }

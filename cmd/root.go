@@ -31,7 +31,10 @@ var (
         // Here i should run the defautl command(AKA: no flags so it should show 
         // every docker/podman, and kubernetes stats)
         Run: func(cmd *cobra.Command, args []string) { 
-            t := tea.NewProgram(tui.NewModel(docker, podman, kubernetes, all))
+            if !docker && !podman && !kubernetes && !all {
+                docker = true
+            }
+            t := tea.NewProgram(tui.NewModel(docker, podman, kubernetes, all), tea.WithAltScreen())
             if _, err := t.Run(); err != nil {
                 fmt.Printf("there has been an error: %v", err)
                 os.Exit(1)
