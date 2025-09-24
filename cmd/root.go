@@ -19,6 +19,8 @@ var (
 
     all bool
 
+    version = "0.0.1-beta"
+
     rootCmd = &cobra.Command{
         Use:   "contyard",
         Short: "A tui application that monitors and manages Docker/Podman containers",
@@ -28,6 +30,7 @@ var (
             running containers, it allows you stopping/starting containers, and it shows logs  
             interactively.
     `,
+        Version: version,
         // Here i should run the defautl command(AKA: no flags so it should show 
         // every docker/podman, and kubernetes stats)
         Run: func(cmd *cobra.Command, args []string) { 
