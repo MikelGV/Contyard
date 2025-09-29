@@ -1,21 +1,46 @@
 #!/bin/bash
-VERSION="0.0.1-beta"
+set -e
+
+VERSION="${TAG:-0.0.1-beta}"
 OUTPUT_DIR="bin"
 mkdir -p $OUTPUT_DIR
 
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o $OUTPUT_DIR/contyard-linux-amd64-$VERSION ./main.go
-CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o $OUTPUT_DIR/contyard-linux-arm64-$VERSION ./main.go
+command -v tar >/dev/null 2>&1 || { echo "tar is required but not installed"; exit 1; }
+command -v zip >/dev/null 2>&1 || { echo "zip is required but not installed"; exit 1; }
 
-GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o $OUTPUT_DIR/contyard-darwin-amd64-$VERSION ./main.go 
-GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o $OUTPUT_DIR/contyard-darwin-arm64-$VERSION ./main.go 
+rm -f "$OUTPUT_DIR"/.tar.gz*
 
-GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o $OUTPUT_DIR/contyard-windows-amd64-$VERSION.exe ./main.go 
-GOOS=windows GOARCH=arm64 go build -ldflags="-s -w" -o $OUTPUT_DIR/contyard-windows-arm64-$VERSION.exe ./main.go 
+PLATFORMS=("linux/amd64" "linux/arm64" "darwin/amd64" "darwin/arm64" "windows/amd64" "windows/arm64")
+for platform in "${PLATFORMS[@]}"; do
+    GOOS=${platform%/*}
+    GOARCH=${platform#*/}
+    OUTPUT="${OUTPUT_DIR}/contyard-${GOOS}-${GOARCH}-${VERSION}"
+    if [ "$GOOS" = "windows" ]; then
+        OUTPUT="${OUTPUT}.exe"
+    fi
 
-cd $OUTPUT_DIR
-tar -czf contyard-linux-amd64-$VERSION.tar.gz contyard-linux-amd64-$VERSION
-tar -czf contyard-linux-arm64-$VERSION.tar.gz contyard-linux-arm64-$VERSION
-tar -czf contyard-darwin-amd64-$VERSION.tar.gz contyard-linux-amd64-$VERSION
-tar -czf contyard-darwin-arm64-$VERSION.tar.gz contyard-linux-arm64-$VERSION
-zip contyard-windows-amd64-$VERSION.zip contyard-windows-amd64-$VERSION.exe
-zip contyard-windows-arm64-$VERSION.zip contyard-windows-arm64-$VERSION.exe
+    echo "Building for $GOOS/$GOARCH..."
+    CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH go build -ldflags="-s -w" -o "$OUTPUT" ./main.go
+done
+
+cd "$OUTPUT_DIR"
+for platform in "${PLATFORMS[@]}"; do
+    GOOS=${platform%/*}
+    GOARCH=${platform#*/}
+    BINARY="contyard-${GOOS}-${GOARCH}-${VERSION}"
+    ARCHIVE="contyard-${GOOS}-${GOARCH}-${VERSION}"
+    if [ "$GOOS" = "windows" ]; then
+        ARCHIVE="${ARCHIVE}.zip"
+        BINARY="${BINARY}.exe"
+        echo "Creating $ARCHIVE..."
+        zip "$ARCHIVE" "$BINARY" || { echo "Failed to create $ARCHIVE"; exit 1; }
+    else
+        ARCHIVE="${ARCHIVE}.tar.gz"
+        echo "Creating $ARCHIVE..."
+        tar -czf "$ARCHIVE" "$BINARY" || { echo "Failed to create $ARCHIVE"; exit 1; }
+
+    fi
+done
+
+
+

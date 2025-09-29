@@ -28,7 +28,7 @@ curl -sL "$URL" -o "/tmp/${FILE}" || { echo "Failed to download ${FILE}"; exit 1
 tar -xzf "/tmp/${FILE}" -C /tmp || { echo "Failed to extract ${FILE}"; exit 1; }
 BINARY="/tmp/${BINARY_NAME}-${OS}-${ARCH}-${VERSION}"
 if [ ! -f "$BINARY_NAME" ]; then
-    echo"Binary ${BINARY} not found in archive"
+    echo "Binary ${BINARY} not found in archive"
     exit 1
 fi
 
