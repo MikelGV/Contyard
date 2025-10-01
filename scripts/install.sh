@@ -3,7 +3,8 @@ set -e
 
 REPO="MikelGV/Contyard"
 BINARY_NAME="contyard"
-INSTALL_PATH="usr/local/bin/${BINARY_NAME}"
+INSTALL_PATH="$HOME/.local/bin/${BINARY_NAME}"
+mkdir -p "$HOME/.local/bin"
 
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 ARCH=$(uname -m)
@@ -13,7 +14,7 @@ case "$ARCH" in
     *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
 esac
 case "$OS" in
-    linux | darwin | windows) ;;
+    linux | darwin) ;;
     *) echo "Unsuported OS: $OS"; exit 1 ;;
 esac
 
@@ -25,25 +26,20 @@ URL="https://github.com/${REPO}/releases/download/v${VERSION}/${FILE}"
 
 echo "Downloading ${FILE} from ${URL}..."
 curl -sL "$URL" -o "/tmp/${FILE}" || { echo "Failed to download ${FILE}"; exit 1; }
-tar -xzf "/tmp/${FILE}" -C /tmp || { echo "Failed to extract ${FILE}"; exit 1; }
+echo "Extracting ${FILE} to /tmp..."
 
-echo "Listing extracted files in /tmp"
-find /tmp -maxdepth 2 -type f
+rm -f "/tmp/${BINARY_NAME}-${OS}-${ARCH}-${VERSION}" "/tmp/${BINARY_NAME}"
+tar -xzf "/tmp/${FILE}" -C /tmp || { echo "Failed to extract ${FILE}"; exit 1; }
 
 BINARY="/tmp/${BINARY_NAME}-${OS}-${ARCH}-${VERSION}"
 FALLBACK_BINARY="/tmp/${BINARY_NAME}"
-
-SUBDIR_BINARY=$(find /tmp -type f -name "${BINARY_NAME}-${OS}-${ARCH}-${VERSION}" -maxdepth 2 | head -n 1)
-if [ ! -f "$BINARY"]; then
+if [ -f "$BINARY" ]; then
     echo "Found binary; $BINARY"
-elif [ -n "$SUBDIR_BINARY" ]; then
-    echo "Found binary in subdirectory: $SUBDIR_BINARY"
-    mv "$SUBDIR_BINARY" "$BINARY"
 elif [ -f "$FALLBACK_BINARY" ]; then
     echo "Found fallback binary: $FALLBACK_BINARY"
     mv "$FALLBACK_BINARY" "$BINARY"
 else
-    echo "Binary $BINARY, $FALLBACK_BINARY, or ${BINARY_NAME}-${OS}-${ARCH}-${VERSION} in subdirectories not ofund in archive"
+    echo "Binary $BINARY, or $FALLBACK_BINARY not found in archive"
     exit 1
 fi
 
